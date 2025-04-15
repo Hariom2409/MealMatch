@@ -1,14 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Container, Row, Col, Form, Button, Card, Alert, Spinner, ProgressBar } from 'react-bootstrap';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import Layout from '@/components/layout/Layout';
 import { useAuth } from '@/context/AuthContext';
-import { FaUtensils, FaCalendarAlt, FaMapMarkerAlt, FaInfoCircle, FaUpload, FaCheck, FaExclamationTriangle, FaMap } from 'react-icons/fa';
+import { FaUtensils, FaCalendarAlt, FaMapMarkerAlt, FaInfoCircle, FaUpload, FaCheck, FaExclamationTriangle, FaMap, FaSearch } from 'react-icons/fa';
 import { createFoodPost } from '@/services/foodPostService';
 import { SafetyChecklist } from '@/types';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import AuthCheck from '@/components/auth/AuthCheck';
+import Script from 'next/script';
+
+// Dynamically import Google Maps component to avoid SSR issues
+const MapWithMarkers = dynamic(
+  () => import('@/components/map/GoogleMapComponents'),
+  { ssr: false, loading: () => <div style={{ height: '300px', width: '100%', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spinner animation="border" /></div> }
+);
 
 const PostFoodDonation = () => {
   const router = useRouter();
@@ -60,6 +67,11 @@ const PostFoodDonation = () => {
   const [coordinates, setCoordinates] = useState({ lat: 0, lng: 0 });
   const [mapCenter, setMapCenter] = useState({ lat: 0, lng: 0 });
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [useSimpleMap, setUseSimpleMap] = useState(false);
+  
+  // Add a ref for the autocomplete input
+  const autocompleteInputRef = useRef<HTMLInputElement>(null);
+  const [placesScriptLoaded, setPlacesScriptLoaded] = useState(false);
   
   useEffect(() => {
     if (!currentUser) {
@@ -171,37 +183,98 @@ const PostFoodDonation = () => {
     return () => clearInterval(interval);
   };
   
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+  const handleMapClick = (e: any) => {
+    // This won't be directly called with our iframe implementation
+    // But we keep it for compatibility with any future changes
+    console.log('Map clicked event received:', e);
+    
     if (e.latLng) {
       const newCoordinates = {
         lat: e.latLng.lat(),
         lng: e.latLng.lng()
       };
+      console.log('Setting new coordinates:', newCoordinates);
       setCoordinates(newCoordinates);
       
-      // Reverse geocode to get address
-      const geocoder = new google.maps.Geocoder();
-      geocoder.geocode({ location: newCoordinates }, (results, status) => {
-        if (status === 'OK' && results?.[0]) {
-          setLocation(results[0].formatted_address);
+      // Geocode the address if Google Maps is available
+      if (window.google && window.google.maps) {
+        try {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: newCoordinates }, (results: any, status: string) => {
+            console.log('Geocoding results:', results);
+            console.log('Geocoding status:', status);
+            if (status === 'OK' && results?.[0]) {
+              console.log('Setting location to:', results[0].formatted_address);
+              setLocation(results[0].formatted_address);
+            }
+          });
+        } catch (error) {
+          console.error('Error during geocoding:', error);
         }
-      });
+      }
     }
   };
   
-  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLocation(e.target.value);
-    // Geocode the address to get coordinates
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ address: e.target.value }, (results, status) => {
-      if (status === 'OK' && results?.[0]) {
-        const location = results[0].geometry.location;
-        setCoordinates({
-          lat: location.lat(),
-          lng: location.lng()
+  // Manual geocoding function (for when we need to convert an address to coordinates)
+  const geocodeAddress = (address: string) => {
+    // Open a new tab with Google Maps search for this address
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
+  };
+  
+  // Add useEffect to initialize Places Autocomplete when script is loaded
+  useEffect(() => {
+    // Only try to initialize if the script is loaded and the input ref is available
+    if (placesScriptLoaded && autocompleteInputRef.current && window.google) {
+      try {
+        const autocomplete = new window.google.maps.places.Autocomplete(
+          autocompleteInputRef.current,
+          { types: ['address'] }
+        );
+        
+        // Add listener for place selection
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace();
+          console.log('Selected place:', place);
+          
+          if (place.formatted_address) {
+            setLocation(place.formatted_address);
+          }
+          
+          if (place.geometry && place.geometry.location) {
+            const newCoordinates = {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng()
+            };
+            setCoordinates(newCoordinates);
+            setMapCenter(newCoordinates);
+          }
         });
+      } catch (error) {
+        console.error('Error initializing Places Autocomplete:', error);
       }
-    });
+    }
+  }, [placesScriptLoaded, autocompleteInputRef.current]);
+
+  // Add this to handle when Google Places script loads
+  const handlePlacesScriptLoad = () => {
+    console.log('Places script loaded');
+    setPlacesScriptLoaded(true);
+  };
+  
+  const handleLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newLocation = e.target.value;
+    setLocation(newLocation);
+    
+    // We don't need to manually geocode anymore since Places Autocomplete will handle this
+    // Keep minimal logic in case Places isn't loaded
+    if (newLocation && newLocation.trim().length > 3 && !placesScriptLoaded) {
+      try {
+        // Fallback geocoding if Places not loaded
+        // ... existing geocoding code ...
+      } catch (error) {
+        console.error('Error during geocoding:', error);
+      }
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -421,8 +494,128 @@ const PostFoodDonation = () => {
     </>
   );
   
+  useEffect(() => {
+    if (showMap && mapCenter.lat === 0 && mapCenter.lng === 0) {
+      console.log('No map center set, trying to get current location');
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const newCenter = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+            console.log('Setting map center to current location:', newCenter);
+            setMapCenter(newCenter);
+            
+            // If no coordinates set yet, also set coordinates
+            if (coordinates.lat === 0 && coordinates.lng === 0) {
+              setCoordinates(newCenter);
+            }
+          },
+          (error) => {
+            console.error('Error getting location:', error);
+          }
+        );
+      }
+    }
+  }, [showMap, mapCenter, coordinates]);
+  
+  const renderMap = () => {
+    if (!showMap) return null;
+    
+    // Check if API key is properly set
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+    console.log('Google Maps API Key (first few chars):', apiKey ? apiKey.substring(0, 5) + '...' : 'missing');
+    
+    const isValidApiKey = apiKey && apiKey !== 'YOUR_GOOGLE_MAPS_API_KEY' && apiKey !== '';
+    
+    if (!isValidApiKey) {
+      return (
+        <div 
+          style={{ 
+            height: '300px', 
+            width: '100%', 
+            backgroundColor: '#f8f9fa', 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '20px',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            color: '#dc3545'
+          }}
+        >
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>
+            <FaExclamationTriangle className="me-2" /> Google Maps API Key Not Configured
+          </div>
+          <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+            To use this feature, you need to add a valid Google Maps API key to your <code>.env.local</code> file.
+            <br/><br/>
+            Update the <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> value with your actual API key.
+          </div>
+        </div>
+      );
+    }
+    
+    // Ensure we have valid coordinates
+    const validCenter = (mapCenter.lat !== 0 || mapCenter.lng !== 0) 
+      ? mapCenter 
+      : { lat: 40.712776, lng: -74.005974 }; // Default to NYC
+    
+    console.log('Rendering map with center:', validCenter);
+    
+    return (
+      <div>
+        <div style={{ height: '300px', width: '100%', marginBottom: '1rem' }}>
+          <MapWithMarkers
+            googleMapsApiKey={apiKey}
+            mapContainerStyle={{ height: '100%', width: '100%' }}
+            center={validCenter}
+            zoom={15}
+            onClick={handleMapClick}
+            onLoad={() => {
+              console.log('Map loaded successfully');
+              setIsMapLoaded(true);
+            }}
+            markerPosition={coordinates.lat !== 0 ? coordinates : undefined}
+          />
+        </div>
+        
+        {/* Add a helper text to explain how to use the map */}
+        <div className="text-muted mb-3 small">
+          <div className="d-flex align-items-center mb-2">
+            <FaInfoCircle className="me-2 text-primary" />
+            <span>Click on the map to open Google Maps in a new tab and select a precise location.</span>
+          </div>
+          <div className="d-flex align-items-center">
+            <FaSearch className="me-2 text-primary" />
+            <span>You can also find a location by typing an address in the Address field above.</span>
+          </div>
+        </div>
+        
+        {/* Add a search button next to the address field */}
+        <Button 
+          variant="outline-primary"
+          size="sm"
+          className="mt-2"
+          onClick={() => geocodeAddress(location)}
+        >
+          <FaMapMarkerAlt className="me-2" /> Find on Map
+        </Button>
+      </div>
+    );
+  };
+  
   return (
     <Layout title="Post Food Donation - MealMatch" description="Share your excess food with those in need">
+      {/* Google Places script loader */}
+      <Script
+        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+        onLoad={handlePlacesScriptLoad}
+        strategy="afterInteractive"
+      />
+      
       <Container className="py-5">
         <Row className="justify-content-center">
           <Col md={10} lg={8}>
@@ -655,6 +848,7 @@ const PostFoodDonation = () => {
                                     onChange={handleLocationChange}
                                     placeholder="Enter the pickup location address"
                                     required
+                                    ref={autocompleteInputRef}
                                   />
                                   <Button
                                     variant={showMap ? "primary" : "outline-primary"}
@@ -664,25 +858,7 @@ const PostFoodDonation = () => {
                                     {showMap ? 'Hide Map' : 'Show Map'}
                                   </Button>
                                 </div>
-                                {showMap && (
-                                  <div style={{ height: '300px', width: '100%', marginBottom: '1rem' }}>
-                                    <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
-                                      <GoogleMap
-                                        mapContainerStyle={{ height: '100%', width: '100%' }}
-                                        center={mapCenter}
-                                        zoom={15}
-                                        // Temporarily comment out the click handler
-                                        // onClick={handleMapClick}
-                                        onLoad={() => setIsMapLoaded(true)}
-                                      >
-                                        {/* Marker is already commented out */}
-                                        {/* {isMapLoaded && coordinates.lat !== 0 && coordinates.lng !== 0 && (
-                                          <Marker position={coordinates} />
-                                        )} */}
-                                      </GoogleMap>
-                                    </LoadScript>
-                                  </div>
-                                )}
+                                {renderMap()}
                               </Form.Group>
                               
                               <Form.Group className="mb-3">

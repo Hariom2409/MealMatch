@@ -4,5 +4,11 @@
     "files": [
       "static/chunks/node_modules_bootstrap_dist_js_bootstrap_js.js"
     ]
+  },
+  "pages\\donor\\post.tsx -> @/components/map/GoogleMapComponents": {
+    "id": "pages\\donor\\post.tsx -> @/components/map/GoogleMapComponents",
+    "files": [
+      "static/chunks/src_components_map_GoogleMapComponents_tsx.js"
+    ]
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Badge, Button, Table, Nav, Tab, Alert, Spinner, Modal, Form } from 'react-bootstrap';
-import { FaPlus, FaEdit, FaTrash, FaExclamationTriangle, FaRegClock, FaMapMarkerAlt, FaCheck } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaExclamationTriangle, FaRegClock, FaMapMarkerAlt, FaCheck, FaEye } from 'react-icons/fa';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '@/components/layout/Layout';
@@ -38,6 +38,40 @@ const styles = {
   tableModern: {
     borderCollapse: 'separate',
     borderSpacing: '0 10px',
+  },
+  mobileCard: {
+    marginBottom: '1rem',
+    border: 'none',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  mobileCardHeader: {
+    borderBottom: 'none',
+    backgroundColor: 'transparent',
+    padding: '1rem 1rem 0.5rem',
+  },
+  mobileCardBody: {
+    padding: '0.5rem 1rem',
+  },
+  mobileCardFooter: {
+    borderTop: 'none',
+    backgroundColor: 'transparent',
+    padding: '0.5rem 1rem 1rem',
+  },
+  mobileItem: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '0.5rem',
+  },
+  mobileLabel: {
+    width: '100px',
+    color: '#6c757d',
+    fontWeight: '500',
+    fontSize: '0.8rem',
+  },
+  mobileValue: {
+    flex: 1,
+    fontWeight: '500',
   },
 };
 
@@ -132,6 +166,22 @@ const DonorDashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    // Only run the media query on the client side
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(max-width: 768px)');
+      setIsMobile(mediaQuery.matches);
+      
+      const handleResize = (e: MediaQueryListEvent) => {
+        setIsMobile(e.matches);
+      };
+      
+      mediaQuery.addEventListener('change', handleResize);
+      return () => mediaQuery.removeEventListener('change', handleResize);
+    }
+  }, []);
   
   // Stats calculations
   const totalDonations = posts.length;
@@ -250,6 +300,76 @@ const DonorDashboard = () => {
     }
   };
   
+  // Render table rows for mobile view
+  const renderMobileCard = (post: FoodPost) => {
+    return (
+      <Card key={post.id} style={styles.mobileCard}>
+        <Card.Header style={styles.mobileCardHeader}>
+          <div className="d-flex align-items-center">
+            {post.imageUrl && (
+              <div className="me-3">
+                <img 
+                  src={post.imageUrl} 
+                  alt={post.title} 
+                  width="48" 
+                  height="48" 
+                  className="rounded-3 object-fit-cover"
+                  style={{ objectFit: 'cover' }} 
+                />
+              </div>
+            )}
+            <div>
+              <h6 className="mb-0 fw-semibold">{post.title}</h6>
+              <div className="small text-muted">{post.quantity}</div>
+            </div>
+          </div>
+        </Card.Header>
+        <Card.Body style={styles.mobileCardBody}>
+          <div style={styles.mobileItem}>
+            <div style={styles.mobileLabel}>Posted:</div>
+            <div style={styles.mobileValue}>
+              {post.createdAt instanceof Date 
+                ? post.createdAt.toLocaleDateString() 
+                : new Date(post.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+          <div style={styles.mobileItem}>
+            <div style={styles.mobileLabel}>Expires:</div>
+            <div style={styles.mobileValue}>
+              {post.expiryTime instanceof Date 
+                ? post.expiryTime.toLocaleDateString() 
+                : new Date(post.expiryTime).toLocaleDateString()}
+            </div>
+          </div>
+          <div style={styles.mobileItem}>
+            <div style={styles.mobileLabel}>Status:</div>
+            <div style={styles.mobileValue}>
+              <StatusBadge status={post.status} />
+            </div>
+          </div>
+        </Card.Body>
+        <Card.Footer style={styles.mobileCardFooter}>
+          <div className="d-flex gap-2 justify-content-end">
+            <Button 
+              size="sm" 
+              variant="outline-danger"
+              onClick={() => handleDeleteClick(post.id)}
+            >
+              <FaTrash className="me-1" /> Delete
+            </Button>
+            <Button 
+              size="sm" 
+              variant="primary"
+              onClick={() => router.push(`/donor/post/${post.id}`)}
+            >
+              <FaEye className="me-1" /> View
+            </Button>
+          </div>
+        </Card.Footer>
+      </Card>
+    );
+  };
+
   if (!currentUser || currentUser.role !== 'donor') {
     return (
       <Layout title="Loading - MealMatch">
@@ -414,72 +534,78 @@ const DonorDashboard = () => {
                       </Link>
                     </div>
                   ) : (
-                    <div className="table-responsive">
-                      <Table hover className="align-middle table-modern">
-                        <thead className="text-muted">
-                          <tr>
-                            <th>Donation</th>
-                            <th>Posted</th>
-                            <th>Expires</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {posts.filter(post => post.status === 'available').map(post => (
-                            <tr key={post.id} className="align-middle">
-                              <td>
-                                <div className="d-flex align-items-center">
-                                  {post.imageUrl && (
-                                    <div className="me-3">
-                                      <img 
-                                        src={post.imageUrl} 
-                                        alt={post.title} 
-                                        width="48" 
-                                        height="48" 
-                                        className="rounded-3 object-fit-cover"
-                                        style={{ objectFit: 'cover' }} 
-                                      />
-                                    </div>
-                                  )}
-                                  <div>
-                                    <h6 className="mb-1 fw-semibold">{post.title}</h6>
-                                    <div className="small text-muted">{post.quantity}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td>
-                                <div className="small text-success">{formatRelativeTime(post.createdAt)}</div>
-                              </td>
-                              <td>
-                                <div className="d-flex align-items-center small">
-                                  <FaRegClock className="me-1 text-warning" />
-                                  <span>{formatDate(post.expiryTime)}</span>
-                                </div>
-                              </td>
-                              <td><StatusBadge status={post.status} /></td>
-                              <td>
-                                <div className="d-flex">
-                                  <Link href={`/donor/edit/${post.id}`}>
-                                    <Button variant="outline-primary" size="sm" className="me-2 rounded-pill px-3">
-                                      <FaEdit className="me-1" /> Edit
-                                    </Button>
-                                  </Link>
-                                  <Button 
-                                    variant="outline-danger" 
-                                    size="sm"
-                                    className="rounded-pill px-3"
-                                    onClick={() => handleDeleteClick(post.id)}
-                                  >
-                                    <FaTrash className="me-1" /> Delete
-                                  </Button>
-                                </div>
-                              </td>
+                    isMobile ? (
+                      <div className="p-3">
+                        {posts.filter(post => post.status === 'available').map(post => renderMobileCard(post))}
+                      </div>
+                    ) : (
+                      <div className="table-responsive">
+                        <Table hover className="align-middle table-modern">
+                          <thead className="text-muted">
+                            <tr>
+                              <th>Donation</th>
+                              <th>Posted</th>
+                              <th>Expires</th>
+                              <th>Status</th>
+                              <th>Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {posts.filter(post => post.status === 'available').map(post => (
+                              <tr key={post.id} className="align-middle">
+                                <td>
+                                  <div className="d-flex align-items-center">
+                                    {post.imageUrl && (
+                                      <div className="me-3">
+                                        <img 
+                                          src={post.imageUrl} 
+                                          alt={post.title} 
+                                          width="48" 
+                                          height="48" 
+                                          className="rounded-3 object-fit-cover"
+                                          style={{ objectFit: 'cover' }} 
+                                        />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <h6 className="mb-1 fw-semibold">{post.title}</h6>
+                                      <div className="small text-muted">{post.quantity}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div className="small text-success">{formatRelativeTime(post.createdAt)}</div>
+                                </td>
+                                <td>
+                                  <div className="d-flex align-items-center small">
+                                    <FaRegClock className="me-1 text-warning" />
+                                    <span>{formatDate(post.expiryTime)}</span>
+                                  </div>
+                                </td>
+                                <td><StatusBadge status={post.status} /></td>
+                                <td>
+                                  <div className="d-flex">
+                                    <Link href={`/donor/edit/${post.id}`}>
+                                      <Button variant="outline-primary" size="sm" className="me-2 rounded-pill px-3">
+                                        <FaEdit className="me-1" /> Edit
+                                      </Button>
+                                    </Link>
+                                    <Button 
+                                      variant="outline-danger" 
+                                      size="sm"
+                                      className="rounded-pill px-3"
+                                      onClick={() => handleDeleteClick(post.id)}
+                                    >
+                                      <FaTrash className="me-1" /> Delete
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      </div>
+                    )
                   )}
                 </Tab.Pane>
                 
