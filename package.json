@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && powershell -Command \"Copy-Item public/404.html -Destination out/404.html -Force\"",
+    "build": "next build && mkdir -p out && cp -f public/404.html out/404.html || true",
     "start": "next start",
     "lint": "next lint",
-    "export": "next build && powershell -Command \"Copy-Item public/404.html -Destination out/404.html -Force\"",
-    "deploy": "next build && powershell -Command \"Copy-Item public/404.html -Destination out/404.html -Force\" && powershell -Command \"New-Item -Path out/.nojekyll -ItemType File -Force\"",
-    "gh-pages": "gh-pages -d out"
+    "export": "next build && mkdir -p out && cp -f public/404.html out/404.html || true",
+    "deploy": "next build && mkdir -p out && cp -f public/404.html out/404.html && touch out/.nojekyll",
+    "gh-pages": "gh-pages -d out",
+    "vercel-build": "next build"
   },
   "dependencies": {
     "axios": "^1.5.1",
