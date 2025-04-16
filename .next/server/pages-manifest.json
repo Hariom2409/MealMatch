@@ -1,8 +1,1 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/": "pages/index.js",
-  "/donor/post": "pages/donor/post.js",
-  "/login": "pages/login.js"
-}
+{"/_app":"pages/_app.js","/_error":"pages/_error.js","/donor/create":"pages/donor/create.html","/about":"pages/about.html","/donor/dashboard":"pages/donor/dashboard.html","/donor/post":"pages/donor/post.html","/firebase-test":"pages/firebase-test.html","/":"pages/index.html","/login":"pages/login.html","/ngo/claim/[id]":"pages/ngo/claim/[id].html","/ngo/dashboard":"pages/ngo/dashboard.html","/profile":"pages/profile.html","/recipient/dashboard":"pages/recipient/dashboard.html","/verify-email":"pages/verify-email.html","/register":"pages/register.html","/_document":"pages/_document.js","/404":"pages/404.html"}

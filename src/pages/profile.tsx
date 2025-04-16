@@ -159,7 +159,15 @@ const Profile = () => {
       // Get most common food types
       const foodTypes: Record<string, number> = {};
       posts.forEach(post => {
-        const type = post.foodType || 'other';
+        // Use isVegetarian or isNonVegetarian as those exist in the FoodPost type
+        let type = 'other';
+        if (post.isVegetarian) {
+          type = 'vegetarian';
+        } else if (post.isNonVegetarian) {
+          type = 'non-vegetarian';
+        } else if (post.isGlutenFree) {
+          type = 'gluten-free';
+        }
         foodTypes[type] = (foodTypes[type] || 0) + 1;
       });
       

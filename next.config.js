@@ -4,8 +4,9 @@ const nextConfig = {
   // When building for GitHub Pages deployment
   // Comment these out for local development
   // Uncomment for production build
-  // output: 'export', // Outputs a static website
-  // trailingSlash: true, // Add trailing slashes to all URLs
+  output: 'export', // Outputs a static website
+  trailingSlash: true, // Add trailing slashes to all URLs
+  distDir: 'out',
   images: {
     remotePatterns: [
       {
@@ -18,7 +19,7 @@ const nextConfig = {
       },
     ],
     // Uncomment this for static export to GitHub Pages
-    // unoptimized: true, // Required for static export
+    unoptimized: true, // Required for static export
   },
 }
 
